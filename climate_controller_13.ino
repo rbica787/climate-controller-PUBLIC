@@ -1,7 +1,6 @@
 /*
  * this revision:
  * this code adds the outputs for the email signals
- * it also reinserts the status code blocks that gpt ommitted
  * 
  * 
  * date of last revision: 6/28/2024
