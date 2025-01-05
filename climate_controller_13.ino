@@ -1,9 +1,9 @@
 /*
  * this revision:
- * this code adds the outputs for the email signals
+ * this code adds the heater function
  * 
  * 
- * date of last revision: 6/28/2024
+ * date of last revision: 1/4/25
  */
 #include <DHT.h>
 #include <DHT_U.h>
@@ -16,16 +16,26 @@ LiquidCrystal_I2C lcd(0x27, 16, 2); // I2C address 0x27, 16 column and 2 rows
 //#define DEBUG_CURRENT_TRANSFORMER
 //#define showTimers
 
-#define max_Humidity 50
-#define Humidity_offset 1
-#define Temp_offset 0
-#define functional_Dehumidifier_Temp 60
-#define humidity_deadband 5
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//these are specific to the humidity sensor and the calibration
+
+#define Humidity_offset -3
+#define Temp_offset -1
+
 #define DHT_TYPE DHT11 // DHT sensor
+#define max_Humidity 49
+#define humidity_deadband 4
+#define min_spaceTemp 65
+#define heat_disable_temp 70
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+#define functional_Dehumidifier_Temp 60
 #define DHT_PIN 12     // the temperature and humidity sensor
 #define DHT_sensor_Delay 2000
 #define defumidifier_1_Pin 5
 #define defumidifier_2_Pin 4
+#define heater_Pin 3
 #define dehumidifier_Status_pin A0
 #define RELAY_ON 0
 #define RELAY_OFF 1
@@ -131,12 +141,12 @@ void loop() {
     lcd.clear();
     lcd.setCursor(0, 0); // go to start of 1st line
     lcd.print("Temp = ");
-    lcd.print(fahrenheitVal, 0);
+    lcd.print(fahrenheitVal, 1);
     lcd.print((char)223);
     lcd.print("F");
     lcd.setCursor(0, 1); // go to start of 2nd line
     lcd.print("Humidity = ");
-    lcd.print(currentHumidity, 0);
+    lcd.print(currentHumidity, 1);
     lcd.print("%");
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -473,6 +483,13 @@ void loop() {
  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   // Heater control (eventually)
+  if(fahrenheitVal < min_spaceTemp){
+    DigitalWrite(heater_Pin, RELAY_ON);
+  }
+  if(fahrenheitVal > heat_disable_temp){
+    DigitalWrite(heater_Pin, RELAY_OFF);
+  }
+
 }
 
 float getVPP() {
