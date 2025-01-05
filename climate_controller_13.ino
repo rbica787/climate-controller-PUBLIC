@@ -101,11 +101,13 @@ void setup() {
   Serial.begin(9600);
   pinMode(defumidifier_1_Pin, OUTPUT);
   pinMode(defumidifier_2_Pin, OUTPUT);
+  pinMode(heater_Pin, OUTPUT);
   pinMode(dehumidifier_Status_pin, INPUT);
   pinMode(D1_faultPin, OUTPUT);
   pinMode(HH_faultPin, OUTPUT);
   digitalWrite(defumidifier_1_Pin, RELAY_OFF);
   digitalWrite(defumidifier_2_Pin, RELAY_OFF);
+  digitalWrite(heater_Pin, RELAY_OFF);
   digitalWrite(D1_faultPin, LOW);
   digitalWrite(HH_faultPin, LOW);
 }
