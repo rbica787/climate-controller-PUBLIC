@@ -484,10 +484,10 @@ void loop() {
 
   // Heater control (eventually)
   if(fahrenheitVal < min_spaceTemp){
-    DigitalWrite(heater_Pin, RELAY_ON);
+    digitalWrite(heater_Pin, RELAY_ON);
   }
   if(fahrenheitVal > heat_disable_temp){
-    DigitalWrite(heater_Pin, RELAY_OFF);
+    digitalWrite(heater_Pin, RELAY_OFF);
   }
 
 }
