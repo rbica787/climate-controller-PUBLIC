@@ -26,7 +26,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2); // I2C address 0x27, 16 column and 2 rows
 #define max_Humidity 49
 #define humidity_deadband 4
 #define min_spaceTemp 65
-#define heat_disable_temp 72
+#define heat_disable_temp 70
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
