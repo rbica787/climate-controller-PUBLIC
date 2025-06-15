@@ -1,26 +1,3 @@
-/*
-  Richard Bica
-
-  description:
-  this was supposed to be a temporary program to get the most important notifications going. Although,
-  for V2.0, I will likely switch to a singular controller for the entire project, and this sketch will
-  probably get tossed.
-
-  README:
-  Please bear in mind that there are several aspects of this program that need to be personalized.
-  If you want to see how to configure the program, follow the links below.
-
-  this is a revised rendition of a program by Rui Santos
-  project details at:
-   - ESP32: https://RandomNerdTutorials.com/esp32-send-email-smtp-server-arduino-ide/
-   - ESP8266: https://RandomNerdTutorials.com/esp8266-nodemcu-send-email-smtp-server-arduino/
-  
-  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files.
-  The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-  Example adapted from: https://github.com/mobizt/ESP-Mail-Client
-*/
-
-
 #include <Arduino.h>
 #if defined(ESP32)
   #include <WiFi.h>
@@ -60,8 +37,19 @@ int HH_fault_signal = 0;
 boolean D1_one_shot = 0;
 boolean HH_one_shot = 0;
 
+boolean HH_delay_met = 0;
+boolean D1_delay_met = 0;
+
+unsigned long currentmillis;
+unsigned long last_HumidityEmail_Time = 0;
+unsigned long last_D1_Email_Time = 0;
+unsigned long HighHumidity_emailDelay = 1;
+unsigned long DehumidifierFault_emailDelay = 4;
+
 
 void setup(){
+  HighHumidity_emailDelay = HighHumidity_emailDelay * 3600000;  // this converts from hours to milliseconds
+  DehumidifierFault_emailDelay = DehumidifierFault_emailDelay * 3600000;  // this converts from hours to milliseconds
   Serial.begin(115200);
   Serial.println();
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -76,31 +64,71 @@ void setup(){
 
 
 void loop(){
+  currentmillis = millis();
   D1_fault_signal = digitalRead(D1_pin);
   HH_fault_signal = digitalRead(HH_pin);
+  HH_delay_met = (currentmillis - last_HumidityEmail_Time) >= HighHumidity_emailDelay;
+  D1_delay_met = (currentmillis - last_D1_Email_Time) >= DehumidifierFault_emailDelay;
   
   #ifdef DEBUG1
-    Serial.print("D1_fault_signal = ");
+    Serial.println("");
+    Serial.println("");
+    Serial.println("________________________________________________________________________________________________________________________________________________");
+    Serial.println("");
+    Serial.println("");
+    Serial.println("D1_fault_signal && (!D1_one_shot || D1_delay_met)");
     Serial.print(D1_fault_signal);
-    Serial.print("         HH_fault_signal = ");
-    Serial.println(HH_fault_signal);
+    Serial.print(" && (");
+    Serial.print(!D1_one_shot);
+    Serial.print(" || ");
+    Serial.print(D1_delay_met);
+    Serial.println(")");
+    Serial.println("");
+
+    Serial.print("D1_delay_met = (currentmillis - last_HumidityEmail_Time) >= HighHumidity_emailDelay ------>   ");
+    Serial.print(currentmillis - last_D1_Email_Time);
+    Serial.print(" >= ");
+    Serial.print(DehumidifierFault_emailDelay);
+    Serial.println("");
+    Serial.println("");
+    Serial.println("");
+
+    
+    Serial.println("HH_fault_signal && (!HH_one_shot || HH_delay_met)");
+    Serial.print(HH_fault_signal);
+    Serial.print(" && (");
+    Serial.print(!HH_one_shot);
+    Serial.print(" || ");
+    Serial.print(HH_delay_met);
+    Serial.println(")");
+    Serial.println("");
+    
+    Serial.print("HH_delay_met = (currentmillis - last_HumidityEmail_Time) >= HighHumidity_emailDelay ------>   ");
+    Serial.print(currentmillis - last_HumidityEmail_Time);
+    Serial.print(" >= ");
+    Serial.print(HighHumidity_emailDelay);
+    Serial.println("");
+    Serial.println("");
+    Serial.println("");
+    Serial.println("________________________________________________________________________________________________________________________________________________");
+    Serial.println("");
+    Serial.println("");
+    delay(2000);
   #endif
 
-  if(D1_fault_signal && D1_one_shot == 0){
+  if(D1_fault_signal && (!D1_one_shot || D1_delay_met)){
     D1_fault();
     D1_one_shot = 1;
-  }
-  else if(!D1_fault_signal){
-    D1_one_shot = 0;
+    last_D1_Email_Time = currentmillis;
   }
 
-  if(HH_fault_signal && HH_one_shot == 0){
+
+  if(HH_fault_signal && (!HH_one_shot || HH_delay_met)){
     Humidity_High_Alert();
     HH_one_shot = 1;
+    last_HumidityEmail_Time = currentmillis;
   }
-  else if(!HH_fault_signal){
-    HH_one_shot = 0;
-  }
+
   delay(2000);  //for stability
 }
 
@@ -208,7 +236,7 @@ void D1_fault(){
   /* Set the message headers */
   message.sender.name = F("ESP");
   message.sender.email = AUTHOR_EMAIL;
-  message.subject = F("SMALL ROOM ALERT");
+  message.subject = F("SMALL ROOM ALERT - DEHUMIDIFIER FULL");
   message.addRecipient(F("Rick"), RECIPIENT_EMAIL);
     
   /*Send HTML message*/
@@ -307,7 +335,7 @@ void Humidity_High_Alert(){
   /* Set the message headers */
   message.sender.name = F("ESP");
   message.sender.email = AUTHOR_EMAIL;
-  message.subject = F("SMALL ROOM ALERT");
+  message.subject = F("SMALL ROOM ALERT - HIGH HUMIDITY");
   message.addRecipient(F("Rick"), RECIPIENT_EMAIL);
     
   /*Send HTML message*/
@@ -343,6 +371,12 @@ void Humidity_High_Alert(){
     else
       Serial.println("\nConnected with no Auth.");
   }
+
+  /* Start sending Email and close the session */
+  if (!MailClient.sendMail(&smtp, &message))
+    ESP_MAIL_PRINTF("Error, Status Code: %d, Error Code: %d, Reason: %s", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
+
+}
 
   /* Start sending Email and close the session */
   if (!MailClient.sendMail(&smtp, &message))
