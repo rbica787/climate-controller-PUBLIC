@@ -43,8 +43,8 @@ boolean D1_delay_met = 0;
 unsigned long currentmillis;
 unsigned long last_HumidityEmail_Time = 0;
 unsigned long last_D1_Email_Time = 0;
-unsigned long HighHumidity_emailDelay = 1;
-unsigned long DehumidifierFault_emailDelay = 4;
+unsigned long HighHumidity_emailDelay = 1;    //delay time in hours
+unsigned long DehumidifierFault_emailDelay = 4;    //delay time in hours
 
 
 void setup(){
@@ -116,18 +116,18 @@ void loop(){
     delay(2000);
   #endif
 
-  if(D1_fault_signal && (!D1_one_shot || D1_delay_met)){
-    D1_fault();
-    D1_one_shot = 1;
-    last_D1_Email_Time = currentmillis;
-  }
+if(D1_fault_signal && (!D1_one_shot || D1_delay_met)){
+  sendEmail("SMALL ROOM ALERT - DEHUMIDIFIER FULL", "Dehumidifier 1 full - Empty Reservoir");
+  D1_one_shot = 1;
+  last_D1_Email_Time = currentmillis;
+}
 
+if(HH_fault_signal && (!HH_one_shot || HH_delay_met)){
+  sendEmail("SMALL ROOM ALERT - HIGH HUMIDITY", "HUMIDITY LEVEL HIGH - Humidity level above threshold deadband");
+  HH_one_shot = 1;
+  last_HumidityEmail_Time = currentmillis;
+}
 
-  if(HH_fault_signal && (!HH_one_shot || HH_delay_met)){
-    Humidity_High_Alert();
-    HH_one_shot = 1;
-    last_HumidityEmail_Time = currentmillis;
-  }
 
   delay(2000);  //for stability
 }
@@ -185,8 +185,8 @@ void smtpCallback(SMTP_Status status){
 
 
 
-void D1_fault(){
-    while (WiFi.status() != WL_CONNECTED){
+void sendEmail(String subject, String body){
+  while (WiFi.status() != WL_CONNECTED){
     Serial.print(".");
     delay(300);
   }
@@ -195,191 +195,46 @@ void D1_fault(){
   Serial.println(WiFi.localIP());
   Serial.println();
 
-  /*  Set the network reconnection option */
   MailClient.networkReconnect(true);
-
-  /** Enable the debug via Serial port
-   * 0 for no debugging
-   * 1 for basic level debugging
-   *
-   * Debug port can be changed via ESP_MAIL_DEFAULT_DEBUG_PORT in ESP_Mail_FS.h
-   */
   smtp.debug(1);
-
-  /* Set the callback function to get the sending results */
   smtp.callback(smtpCallback);
 
-  /* Declare the Session_Config for user defined session credentials */
   Session_Config config;
-
-  /* Set the session config */
   config.server.host_name = SMTP_HOST;
   config.server.port = SMTP_PORT;
   config.login.email = AUTHOR_EMAIL;
   config.login.password = AUTHOR_PASSWORD;
   config.login.user_domain = "";
-
-  /*
-  Set the NTP config time
-  For times east of the Prime Meridian use 0-12
-  For times west of the Prime Meridian add 12 to the offset.
-  Ex. American/Denver GMT would be -6. 6 + 12 = 18
-  See https://en.wikipedia.org/wiki/Time_zone for a list of the GMT/UTC timezone offsets
-  */
   config.time.ntp_server = F("pool.ntp.org,time.nist.gov");
   config.time.gmt_offset = 3;
   config.time.day_light_offset = 0;
 
-  /* Declare the message class */
   SMTP_Message message;
-
-  /* Set the message headers */
   message.sender.name = F("ESP");
   message.sender.email = AUTHOR_EMAIL;
-  message.subject = F("SMALL ROOM ALERT - DEHUMIDIFIER FULL");
+  message.subject = subject;
   message.addRecipient(F("Rick"), RECIPIENT_EMAIL);
-    
-  /*Send HTML message*/
-  /*String htmlMsg = "<div style=\"color:#2f4468;\"><h1>Hello World!</h1><p>- Sent from ESP board</p></div>";
-  message.html.content = htmlMsg.c_str();
-  message.html.content = htmlMsg.c_str();
-  message.text.charSet = "us-ascii";
-  message.html.transfer_encoding = Content_Transfer_Encoding::enc_7bit;*/
 
-   
-  //Send raw text message
-  String textMsg = "Dehumidifier 1 full - Empty Reservoir";
-  message.text.content = textMsg.c_str();
+  message.text.content = body.c_str();
   message.text.charSet = "us-ascii";
   message.text.transfer_encoding = Content_Transfer_Encoding::enc_7bit;
-  
+
   message.priority = esp_mail_smtp_priority::esp_mail_smtp_priority_low;
   message.response.notify = esp_mail_smtp_notify_success | esp_mail_smtp_notify_failure | esp_mail_smtp_notify_delay;
 
-
-  /* Connect to the server */
   if (!smtp.connect(&config)){
-    ESP_MAIL_PRINTF("Connection error, Status Code: %d, Error Code: %d, Reason: %s", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
+    ESP_MAIL_PRINTF("Connection error, Status Code: %d, Error Code: %d, Reason: %s",
+                    smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
     return;
   }
 
   if (!smtp.isLoggedIn()){
     Serial.println("\nNot yet logged in.");
-  }
-  else{
-    if (smtp.isAuthenticated())
-      Serial.println("\nSuccessfully logged in.");
-    else
-      Serial.println("\nConnected with no Auth.");
+  } else {
+    Serial.println(smtp.isAuthenticated() ? "\nSuccessfully logged in." : "\nConnected with no Auth.");
   }
 
-  /* Start sending Email and close the session */
   if (!MailClient.sendMail(&smtp, &message))
-    ESP_MAIL_PRINTF("Error, Status Code: %d, Error Code: %d, Reason: %s", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
-
-}
-
-
-
-
-
-
-void Humidity_High_Alert(){
-    while (WiFi.status() != WL_CONNECTED){
-    Serial.print(".");
-    delay(300);
-  }
-  Serial.println();
-  Serial.print("Connected with IP: ");
-  Serial.println(WiFi.localIP());
-  Serial.println();
-
-  /*  Set the network reconnection option */
-  MailClient.networkReconnect(true);
-
-  /** Enable the debug via Serial port
-   * 0 for no debugging
-   * 1 for basic level debugging
-   *
-   * Debug port can be changed via ESP_MAIL_DEFAULT_DEBUG_PORT in ESP_Mail_FS.h
-   */
-  smtp.debug(1);
-
-  /* Set the callback function to get the sending results */
-  smtp.callback(smtpCallback);
-
-  /* Declare the Session_Config for user defined session credentials */
-  Session_Config config;
-
-  /* Set the session config */
-  config.server.host_name = SMTP_HOST;
-  config.server.port = SMTP_PORT;
-  config.login.email = AUTHOR_EMAIL;
-  config.login.password = AUTHOR_PASSWORD;
-  config.login.user_domain = "";
-
-  /*
-  Set the NTP config time
-  For times east of the Prime Meridian use 0-12
-  For times west of the Prime Meridian add 12 to the offset.
-  Ex. American/Denver GMT would be -6. 6 + 12 = 18
-  See https://en.wikipedia.org/wiki/Time_zone for a list of the GMT/UTC timezone offsets
-  */
-  config.time.ntp_server = F("pool.ntp.org,time.nist.gov");
-  config.time.gmt_offset = 3;
-  config.time.day_light_offset = 0;
-
-  /* Declare the message class */
-  SMTP_Message message;
-
-  /* Set the message headers */
-  message.sender.name = F("ESP");
-  message.sender.email = AUTHOR_EMAIL;
-  message.subject = F("SMALL ROOM ALERT - HIGH HUMIDITY");
-  message.addRecipient(F("Rick"), RECIPIENT_EMAIL);
-    
-  /*Send HTML message*/
-  /*String htmlMsg = "<div style=\"color:#2f4468;\"><h1>Hello World!</h1><p>- Sent from ESP board</p></div>";
-  message.html.content = htmlMsg.c_str();
-  message.html.content = htmlMsg.c_str();
-  message.text.charSet = "us-ascii";
-  message.html.transfer_encoding = Content_Transfer_Encoding::enc_7bit;*/
-
-   
-  //Send raw text message
-  String textMsg = "HUMIDITY LEVEL HIGH - Humidity level above threshold deadband";
-  message.text.content = textMsg.c_str();
-  message.text.charSet = "us-ascii";
-  message.text.transfer_encoding = Content_Transfer_Encoding::enc_7bit;
-  
-  message.priority = esp_mail_smtp_priority::esp_mail_smtp_priority_low;
-  message.response.notify = esp_mail_smtp_notify_success | esp_mail_smtp_notify_failure | esp_mail_smtp_notify_delay;
-
-
-  /* Connect to the server */
-  if (!smtp.connect(&config)){
-    ESP_MAIL_PRINTF("Connection error, Status Code: %d, Error Code: %d, Reason: %s", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
-    return;
-  }
-
-  if (!smtp.isLoggedIn()){
-    Serial.println("\nNot yet logged in.");
-  }
-  else{
-    if (smtp.isAuthenticated())
-      Serial.println("\nSuccessfully logged in.");
-    else
-      Serial.println("\nConnected with no Auth.");
-  }
-
-  /* Start sending Email and close the session */
-  if (!MailClient.sendMail(&smtp, &message))
-    ESP_MAIL_PRINTF("Error, Status Code: %d, Error Code: %d, Reason: %s", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
-
-}
-
-  /* Start sending Email and close the session */
-  if (!MailClient.sendMail(&smtp, &message))
-    ESP_MAIL_PRINTF("Error, Status Code: %d, Error Code: %d, Reason: %s", smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
-
+    ESP_MAIL_PRINTF("Error, Status Code: %d, Error Code: %d, Reason: %s",
+                    smtp.statusCode(), smtp.errorCode(), smtp.errorReason().c_str());
 }
